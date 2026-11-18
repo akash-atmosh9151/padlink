@@ -1,1 +1,44 @@
+name: Build APK from zip
 
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the project
+        run: |
+          set -e
+          if [ -f PadLink.zip ]; then
+            unzip -q PadLink.zip -d unpacked
+            SETTINGS=$(find unpacked -name settings.gradle.kts | head -n 1)
+            echo "PROJECT=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+          elif [ -f settings.gradle.kts ]; then
+            echo "PROJECT=." >> "$GITHUB_ENV"
+          else
+            echo "::error::Upload PadLink.zip to the repo root (or the unzipped project files), then run again."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT }}
+        run: gradle :app:assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PadLink-debug-apk
+          path: ${{ env.PROJECT }}/app/build/outputs/apk/debug/app-debug.apk
