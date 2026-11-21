@@ -17,13 +17,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Unzip project
+        run: |
+          Z=$(find . -maxdepth 2 -iname '*.zip' | head -n1)
+          echo "Zip: $Z"
+          mkdir -p /tmp/proj
+          if [ -n "$Z" ]; then unzip -q -o "$Z" -d /tmp/proj; fi
       - name: Build debug APK
         run: |
-          F=$(find . -name settings.gradle -not -path '*/node_modules/*' | head -n1)
-          echo "Found: $F"
+          F=$(find /tmp/proj . -name settings.gradle -not -path '*/node_modules/*' 2>/dev/null | head -n1)
+          if [ -z "$F" ]; then
+            echo "No settings.gradle found. Files in repo:"
+            find . -not -path './.git/*' | head -50
+            exit 1
+          fi
           DIR=$(dirname "$F")
           gradle -p "$DIR" assembleDebug --no-daemon
-          cp "$DIR/app/build/outputs/apk/debug/app-debug.apk" PadLink.apk
+          cp "$DIR/app/build/outputs/apk/debug/app-debug.apk" "$GITHUB_WORKSPACE/PadLink.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: PadLink-apk
